@@ -5,18 +5,10 @@
 #include <vector>
 #include <filesystem>
 #include <windows.h>
-#include "lzma/Lzma2Dec.h"
-#include "lzma/Alloc.h"
+#include "fast_lzma2/fast-lzma2.h"
 #include "png_split.h"
 
 namespace fs = std::filesystem;
-
-// ==========================================
-// 内存分配
-// ==========================================
-static void* lzma_alloc(ISzAllocPtr, size_t size) { return malloc(size); }
-static void  lzma_free(ISzAllocPtr, void* ptr) { free(ptr); }
-static ISzAlloc g_alloc = { lzma_alloc, lzma_free };
 
 // ==========================================
 // 工具函数
@@ -68,32 +60,24 @@ static void print_progress(const char* label, uint64_t current, uint64_t total, 
 static bool lzma2_decompress(const uint8_t* src, size_t src_size,
     std::vector<uint8_t>& dst)
 {
-    if (src_size < 1 + 8) return false;
+    if (src_size < 8) return false;
 
     uint64_t dst_size = 0;
     for (int i = 0; i < 8; i++)
-        dst_size |= (uint64_t)src[1 + i] << (i * 8);
+        dst_size |= (uint64_t)src[i] << (i * 8);
 
     dst.resize((size_t)dst_size);
 
-    SizeT out_len = (SizeT)dst_size;
-    SizeT in_len = src_size - 1 - 8;
-    ELzmaStatus status;
+    size_t ret = FL2_decompress(
+        dst.data(), dst.size(),
+        src + 8, src_size - 8);
 
-    SRes res = Lzma2Decode(
-        dst.data(), &out_len,
-        src + 1 + 8, &in_len,
-        src[0],
-        LZMA_FINISH_END,
-        &status,
-        &g_alloc);
-
-    if (res != SZ_OK) {
-        printf("[错误] LZMA2 解压失败，错误码: %d\n", res);
+    if (FL2_isError(ret)) {
+        printf("[错误] Fast LZMA2 解压失败: %s\n", FL2_getErrorName(ret));
         return false;
     }
 
-    dst.resize(out_len);
+    dst.resize(ret);
     return true;
 }
 
