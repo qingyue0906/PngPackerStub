@@ -125,6 +125,48 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="fast_lzma2\dict_buffer.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
+    </ClCompile>
+    <ClCompile Include="fast_lzma2\fl2_common.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
+    </ClCompile>
+    <ClCompile Include="fast_lzma2\fl2_compress.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
+    </ClCompile>
+    <ClCompile Include="fast_lzma2\fl2_decompress.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
+    </ClCompile>
+    <ClCompile Include="fast_lzma2\fl2_pool.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
+    </ClCompile>
+    <ClCompile Include="fast_lzma2\fl2_threading.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
+    </ClCompile>
+    <ClCompile Include="fast_lzma2\lzma2_dec.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
+    </ClCompile>
+    <ClCompile Include="fast_lzma2\lzma2_enc.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
+    </ClCompile>
+    <ClCompile Include="fast_lzma2\radix_bitpack.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
+    </ClCompile>
+    <ClCompile Include="fast_lzma2\radix_mf.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
+    </ClCompile>
+    <ClCompile Include="fast_lzma2\radix_struct.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
+    </ClCompile>
+    <ClCompile Include="fast_lzma2\range_enc.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
+    </ClCompile>
+    <ClCompile Include="fast_lzma2\util.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
+    </ClCompile>
+    <ClCompile Include="fast_lzma2\xxhash.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
+    </ClCompile>
     <ClCompile Include="lzma\7zStream.c">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsC</CompileAs>
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
@@ -249,6 +291,29 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="fast_lzma2\atomic.h" />
+    <ClInclude Include="fast_lzma2\compiler.h" />
+    <ClInclude Include="fast_lzma2\count.h" />
+    <ClInclude Include="fast_lzma2\data_block.h" />
+    <ClInclude Include="fast_lzma2\dict_buffer.h" />
+    <ClInclude Include="fast_lzma2\fast-lzma2.h" />
+    <ClInclude Include="fast_lzma2\fastpos_table.h" />
+    <ClInclude Include="fast_lzma2\fl2_compress_internal.h" />
+    <ClInclude Include="fast_lzma2\fl2_errors.h" />
+    <ClInclude Include="fast_lzma2\fl2_internal.h" />
+    <ClInclude Include="fast_lzma2\fl2_pool.h" />
+    <ClInclude Include="fast_lzma2\fl2_threading.h" />
+    <ClInclude Include="fast_lzma2\lzma2_dec.h" />
+    <ClInclude Include="fast_lzma2\lzma2_enc.h" />
+    <ClInclude Include="fast_lzma2\mem.h" />
+    <ClInclude Include="fast_lzma2\platform.h" />
+    <ClInclude Include="fast_lzma2\radix_engine.h" />
+    <ClInclude Include="fast_lzma2\radix_get.h" />
+    <ClInclude Include="fast_lzma2\radix_internal.h" />
+    <ClInclude Include="fast_lzma2\radix_mf.h" />
+    <ClInclude Include="fast_lzma2\range_enc.h" />
+    <ClInclude Include="fast_lzma2\util.h" />
+    <ClInclude Include="fast_lzma2\xxhash.h" />
     <ClInclude Include="lzma\7z.h" />
     <ClInclude Include="lzma\7zTypes.h" />
     <ClInclude Include="lzma\7zWindows.h" />
