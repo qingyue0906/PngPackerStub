@@ -120,7 +120,7 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
@@ -168,6 +168,7 @@
     <ClCompile Include="fast_lzma2\xxhash.c">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
     </ClCompile>
+    <ClCompile Include="gui.cpp" />
     <ClCompile Include="lzma\7zStream.c">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsC</CompileAs>
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
@@ -317,6 +318,7 @@
     <ClInclude Include="fast_lzma2\range_enc.h" />
     <ClInclude Include="fast_lzma2\util.h" />
     <ClInclude Include="fast_lzma2\xxhash.h" />
+    <ClInclude Include="gui.h" />
     <ClInclude Include="lzma\7z.h" />
     <ClInclude Include="lzma\7zTypes.h" />
     <ClInclude Include="lzma\7zWindows.h" />

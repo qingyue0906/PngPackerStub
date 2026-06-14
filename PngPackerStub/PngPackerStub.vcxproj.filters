@@ -168,6 +168,9 @@
     <ClCompile Include="fast_lzma2\xxhash.c">
       <Filter>fast_lzma2</Filter>
     </ClCompile>
+    <ClCompile Include="gui.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="lzma\7z.h">
@@ -337,6 +340,9 @@
     </ClInclude>
     <ClInclude Include="fast_lzma2\xxhash.h">
       <Filter>fast_lzma2</Filter>
+    </ClInclude>
+    <ClInclude Include="gui.h">
+      <Filter>源文件</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
