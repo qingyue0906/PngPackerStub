@@ -111,12 +111,15 @@ bool split_png(const std::string& png_path, PngParts& out)
     int ret = uncompress(out.pixels.data(), &pixels_size,
         raw_idat.data(), (uLong)raw_idat.size());
 
-    if (ret == Z_BUF_ERROR) {
-        // 缓冲区不够，扩大再试一次
-        pixels_size = (uLongf)(raw_idat.size() * 12 + 1024);
+    // 缓冲区不够就翻倍扩大，最多重试 8 次
+    int retry = 0;
+    while (ret == Z_BUF_ERROR && retry < 8)
+    {
+        pixels_size *= 2;
         out.pixels.resize(pixels_size);
         ret = uncompress(out.pixels.data(), &pixels_size,
             raw_idat.data(), (uLong)raw_idat.size());
+        retry++;
     }
 
     if (ret != Z_OK) {
