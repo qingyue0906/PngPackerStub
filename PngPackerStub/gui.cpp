@@ -7,6 +7,10 @@
 #include <atomic>
 #include <mutex>
 #include <chrono>
+
+#include <shlwapi.h>
+#pragma comment(lib, "shlwapi.lib")
+
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "shell32.lib")
 
@@ -32,6 +36,29 @@
 #define WM_EXTRACT_DONE    (WM_USER + 2)
 #define WM_EXTRACT_CANCEL  (WM_USER + 3)
 
+HWND g_prog_hwnd = nullptr;
+
+// 递归给窗口及所有子控件设置字体
+static void set_font_recursive(HWND hwnd, HFONT font)
+{
+    SendMessage(hwnd, WM_SETFONT, (WPARAM)font, TRUE);
+    EnumChildWindows(hwnd, [](HWND child, LPARAM lp) -> BOOL {
+        SendMessage(child, WM_SETFONT, (WPARAM)lp, TRUE);
+        return TRUE;
+        }, (LPARAM)font);
+}
+
+// 创建 Segoe UI 9pt 字体
+static HFONT create_ui_font()
+{
+    return CreateFontA(
+        -MulDiv(9, GetDeviceCaps(GetDC(nullptr), LOGPIXELSY), 72),
+        0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+        CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+        DEFAULT_PITCH | FF_SWISS, "Segoe UI");
+}
+
 // ==========================================
 // 工具：创建标签
 // ==========================================
@@ -56,7 +83,9 @@ static HWND make_label_right(HWND parent, const char* text, int x, int y, int w,
 struct ExtractDlgData
 {
     std::string result;
+    std::string subfolder_name; // exe 文件名（不含扩展名）
     bool        ok = false;
+    bool        extract_to_subfolder = true;
 };
 
 static LRESULT CALLBACK ExtractDlgProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
@@ -75,9 +104,10 @@ static LRESULT CALLBACK ExtractDlgProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp
         make_label(hwnd, "提取到(X):", 12, 14, 80, 18);
 
         // 路径输入框
-        char desktop[MAX_PATH];
-        SHGetFolderPathA(nullptr, CSIDL_DESKTOP, nullptr, 0, desktop);
-        CreateWindowA("EDIT", desktop,
+        char exe_dir[MAX_PATH];
+        GetModuleFileNameA(nullptr, exe_dir, MAX_PATH);
+        PathRemoveFileSpecA(exe_dir);
+        CreateWindowA("EDIT", exe_dir,
             WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
             12, 34, 360, 24, hwnd, (HMENU)IDC_EDIT_PATH, nullptr, nullptr);
 
@@ -86,14 +116,22 @@ static LRESULT CALLBACK ExtractDlgProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp
             WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
             378, 34, 30, 24, hwnd, (HMENU)IDC_BTN_BROWSE, nullptr, nullptr);
 
+        // 勾选框：解压到子文件夹
+        std::string chk_label = "解压到子文件夹 \"" + data->subfolder_name + "\"";
+        HWND hwnd_chk = CreateWindowA("BUTTON", chk_label.c_str(),
+            WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+            12, 68, 400, 20, hwnd, (HMENU)105, nullptr, nullptr);
+        SendMessage(hwnd_chk, BM_SETCHECK, BST_CHECKED, 0); // 默认勾选
+
         // 确定/取消
         CreateWindowA("BUTTON", "确定",
             WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
-            230, 70, 88, 28, hwnd, (HMENU)IDC_BTN_OK, nullptr, nullptr);
+            230, 96, 88, 28, hwnd, (HMENU)IDC_BTN_OK, nullptr, nullptr);
         CreateWindowA("BUTTON", "取消",
             WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-            326, 70, 88, 28, hwnd, (HMENU)IDC_BTN_CANCEL, nullptr, nullptr);
+            326, 96, 88, 28, hwnd, (HMENU)IDC_BTN_CANCEL, nullptr, nullptr);
 
+        set_font_recursive(hwnd, create_ui_font());
         return 0;
     }
 
@@ -138,6 +176,8 @@ static LRESULT CALLBACK ExtractDlgProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp
             char buf[MAX_PATH];
             GetWindowTextA(GetDlgItem(hwnd, IDC_EDIT_PATH), buf, MAX_PATH);
             data->result = buf;
+            data->extract_to_subfolder =
+                (SendMessage(GetDlgItem(hwnd, 105), BM_GETCHECK, 0, 0) == BST_CHECKED);
             data->ok = true;
             DestroyWindow(hwnd);
         }
@@ -161,7 +201,8 @@ static LRESULT CALLBACK ExtractDlgProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp
     return DefWindowProcA(hwnd, msg, wp, lp);
 }
 
-std::string show_extract_dialog(const std::string& default_path)
+std::string show_extract_dialog(const std::string& exe_name,
+    bool& extract_to_subfolder)
 {
     INITCOMMONCONTROLSEX icc = { sizeof(icc), ICC_STANDARD_CLASSES };
     InitCommonControlsEx(&icc);
@@ -175,15 +216,16 @@ std::string show_extract_dialog(const std::string& default_path)
     RegisterClassA(&wc);
 
     ExtractDlgData data;
+    data.subfolder_name = exe_name;
     HWND hwnd = CreateWindowExA(
         WS_EX_DLGMODALFRAME,
         "PngPackerExtractDlg", "提取",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
-        CW_USEDEFAULT, CW_USEDEFAULT, 430, 116,
+        CW_USEDEFAULT, CW_USEDEFAULT, 440, 170,
         nullptr, nullptr, wc.hInstance, &data);
 
     // 居中
-    int W = 430, H = 116;
+    int W = 440, H = 170;
     int x = (GetSystemMetrics(SM_CXSCREEN) - W) / 2;
     int y = (GetSystemMetrics(SM_CYSCREEN) - H) / 2;
     SetWindowPos(hwnd, nullptr, x, y, W, H, SWP_NOZORDER);
@@ -198,6 +240,7 @@ std::string show_extract_dialog(const std::string& default_path)
         DispatchMessage(&msg);
     }
 
+    extract_to_subfolder = data.extract_to_subfolder;
     return data.ok ? data.result : "";
 }
 
@@ -302,6 +345,8 @@ static LRESULT CALLBACK ProgressWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM l
         SetTimer(hwnd, 1, 1000, nullptr);
 
         g_prog->start_time = std::chrono::steady_clock::now();
+
+        set_font_recursive(hwnd, create_ui_font());
         return 0;
     }
 
@@ -335,6 +380,14 @@ static LRESULT CALLBACK ProgressWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM l
             SetWindowTextA(g_prog->hwnd_speed, buf);
         }
 
+        return 0;
+    }
+
+    case WM_SET_TOTAL:
+    {
+        if (!g_prog) break;
+        g_prog->total = (size_t)wp;
+        SendMessage(g_prog->hwnd_prog, PBM_SETRANGE32, 0, (LPARAM)wp);
         return 0;
     }
 
@@ -425,7 +478,7 @@ void run_extract_gui(
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     RegisterClassA(&wc);
 
-    int W = 548, H = 174;
+    int W = 560, H = 210;
     int x = (GetSystemMetrics(SM_CXSCREEN) - W) / 2;
     int y = (GetSystemMetrics(SM_CYSCREEN) - H) / 2;
 
@@ -438,6 +491,7 @@ void run_extract_gui(
 
     ShowWindow(prog.hwnd, SW_SHOW);
     UpdateWindow(prog.hwnd);
+    g_prog_hwnd = prog.hwnd;
 
     // 工作线程
     std::thread work_thread([&]()

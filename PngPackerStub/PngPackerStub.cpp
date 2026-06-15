@@ -110,7 +110,6 @@ static bool read_payload(std::vector<uint8_t>& payload)
 // ==========================================
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
-    // 最先初始化 COM，browse_for_folder 需要
     CoInitialize(nullptr);
 
     SetUnhandledExceptionFilter([](EXCEPTION_POINTERS*) -> LONG {
@@ -118,72 +117,80 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         return EXCEPTION_EXECUTE_HANDLER;
         });
 
-    // 第一步：先让用户选择解压目录
-    std::string out_folder = show_extract_dialog();
+    // 第一步：秒弹选目录窗口，不做任何耗时操作
+    // 获取 exe 文件名（不含扩展名）作为子文件夹名
+    char self_path[MAX_PATH];
+    GetModuleFileNameA(nullptr, self_path, MAX_PATH);
+    std::string exe_name = fs::path(self_path).stem().string();
+
+    bool extract_to_subfolder = true;
+    std::string out_folder = show_extract_dialog(exe_name, extract_to_subfolder);
     if (out_folder.empty()) {
         CoUninitialize();
         return 0;
     }
 
-    // 第二步：读取附加数据
-    std::vector<uint8_t> payload;
-    if (!read_payload(payload)) {
-        CoUninitialize();
-        return 1;
-    }
+    // 如果勾选了，在目标目录下创建同名子文件夹
+    if (extract_to_subfolder)
+        out_folder = (fs::path(out_folder) / exe_name).string();
 
-    // 写到临时文件
-    char tmp_path_buf[MAX_PATH];
-    GetTempPathA(MAX_PATH, tmp_path_buf);
-    std::string tmp_archive = std::string(tmp_path_buf) + "pgksfx_tmp.bin";
-    {
-        std::ofstream tf(tmp_archive, std::ios::binary);
-        tf.write((const char*)payload.data(), payload.size());
-    }
-    payload.clear();
-    payload.shrink_to_fit();
+    fs::create_directories(out_folder);
 
-    // 读取档案尾部
-    uint64_t part1_size, part2_size;
-    if (!read_archive_tail(tmp_archive, part1_size, part2_size)) {
-        MessageBoxA(nullptr, "档案格式无效", "错误", MB_OK | MB_ICONERROR);
-        fs::remove(tmp_archive);
-        CoUninitialize();
-        return 1;
-    }
-
-    // 解压两部分到内存
-    std::vector<ArchiveEntry> part1_entries, part2_entries;
-
-    if (part1_size > 0) {
-        if (!decompress_entries(tmp_archive, 0, part1_size, part1_entries)) {
-            MessageBoxA(nullptr, "图片部分解压失败", "错误", MB_OK | MB_ICONERROR);
-            fs::remove(tmp_archive);
-            CoUninitialize();
-            return 1;
-        }
-    }
-    if (part2_size > 0) {
-        if (!decompress_entries(tmp_archive, part1_size, part2_size, part2_entries)) {
-            MessageBoxA(nullptr, "文件部分解压失败", "错误", MB_OK | MB_ICONERROR);
-            fs::remove(tmp_archive);
-            CoUninitialize();
-            return 1;
-        }
-    }
-    fs::remove(tmp_archive);
-
-    size_t total = part1_entries.size() + part2_entries.size();
-
-    char dbg2[64];
-    snprintf(dbg2, sizeof(dbg2), "total=%zu part1=%zu part2=%zu",
-        total, part1_entries.size(), part2_entries.size());
-    MessageBoxA(nullptr, dbg2, "调试", MB_OK);
-
-    // 第三步：运行解压 GUI
-    run_extract_gui(out_folder, total,
+    // 第二步：弹出进度窗口，所有耗时操作都在进度窗口的工作线程里完成
+    run_extract_gui(out_folder, 0,
         [&](ProgressCallback progress_cb, CancelCallback cancel_cb)
         {
+            // --- 以下全部在工作线程里执行 ---
+
+            // 读取附加数据
+            std::vector<uint8_t> payload;
+            if (!read_payload(payload)) return;
+
+            // 写临时文件
+            char tmp_path_buf[MAX_PATH];
+            GetTempPathA(MAX_PATH, tmp_path_buf);
+            std::string tmp_archive = std::string(tmp_path_buf) + "pgksfx_tmp.bin";
+            {
+                std::ofstream tf(tmp_archive, std::ios::binary);
+                tf.write((const char*)payload.data(), payload.size());
+            }
+            payload.clear();
+            payload.shrink_to_fit();
+
+            // 读取档案尾部
+            uint64_t part1_size, part2_size;
+            if (!read_archive_tail(tmp_archive, part1_size, part2_size)) {
+                MessageBoxA(nullptr, "档案格式无效", "错误", MB_OK | MB_ICONERROR);
+                fs::remove(tmp_archive);
+                return;
+            }
+
+            // 解压两部分
+            std::vector<ArchiveEntry> part1_entries, part2_entries;
+
+            progress_cb("正在解压数据...", 0, 1);
+
+            if (part1_size > 0) {
+                if (!decompress_entries(tmp_archive, 0, part1_size, part1_entries)) {
+                    MessageBoxA(nullptr, "图片部分解压失败", "错误", MB_OK | MB_ICONERROR);
+                    fs::remove(tmp_archive);
+                    return;
+                }
+            }
+            if (part2_size > 0) {
+                if (!decompress_entries(tmp_archive, part1_size, part2_size, part2_entries)) {
+                    MessageBoxA(nullptr, "文件部分解压失败", "错误", MB_OK | MB_ICONERROR);
+                    fs::remove(tmp_archive);
+                    return;
+                }
+            }
+            fs::remove(tmp_archive);
+
+            size_t total = part1_entries.size() + part2_entries.size();
+
+            // 通知 GUI 更新总数
+            PostMessage(g_prog_hwnd, WM_SET_TOTAL, (WPARAM)total, 0);
+
             std::atomic<size_t> done(0);
             std::mutex          print_mutex;
             std::vector<std::pair<std::string, uint64_t>> dir_mtimes;
@@ -196,7 +203,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                 if (thread_count < 1) thread_count = 4;
                 std::vector<std::thread> threads_vec;
 
-                auto worker = [&]()
+                auto worker_fn = [&]()
                     {
                         while (true)
                         {
@@ -245,7 +252,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                     };
 
                 for (int t = 0; t < thread_count; t++)
-                    threads_vec.emplace_back(worker);
+                    threads_vec.emplace_back(worker_fn);
                 for (auto& t : threads_vec)
                     t.join();
             }

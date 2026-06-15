@@ -339,6 +339,7 @@
     <ClInclude Include="lzma\Precomp.h" />
     <ClInclude Include="lzma\Threads.h" />
     <ClInclude Include="png_split.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="rpgmv.h" />
     <ClInclude Include="zlib\crc32.h" />
     <ClInclude Include="zlib\deflate.h" />
