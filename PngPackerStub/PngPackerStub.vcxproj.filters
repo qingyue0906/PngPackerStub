@@ -340,8 +340,5 @@
     <ClInclude Include="gui.h">
       <Filter>源文件</Filter>
     </ClInclude>
-    <ClInclude Include="resource.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
   </ItemGroup>
 </Project>
